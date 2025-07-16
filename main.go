@@ -2,8 +2,13 @@ package main
 
 import (
 	"log"
+	"task_manager/db"
 	"task_manager/router"
 )
+
+func init() {
+	db.ConnectToDB()
+}
 
 func main() {
 	err := router.Run()
@@ -11,4 +16,3 @@ func main() {
 		log.Printf("Failed to start the server: %s", err.Error())
 	}
 }
-

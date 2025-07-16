@@ -1,100 +1,160 @@
 package data
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"slices"
-	"sync"
+	"log"
+	"task_manager/db"
 	"task_manager/models"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
-
-type TaskService struct {
-	tasks []*models.Task
-	mutex sync.RWMutex
-	next  int
-}
-
-// NewTaskService returns a new
-// initialized TaskService struct
-func NewTaskService() *TaskService {
-	return &TaskService{
-		tasks: make([]*models.Task, 0),
-		next:  1,
-	}
-}
 
 // GetAllTasks is a function that return
 // all tasks currently available
-func (ts *TaskService) GetAllTasks() []models.Task {
-	ts.mutex.RLock()
-	defer ts.mutex.RUnlock()
-	result := make([]models.Task, len(ts.tasks))
-	for i, task := range ts.tasks {
-		result[i] = *task
+func GetAllTasks() ([]models.Task, error) {
+	// result := make([]models.Task, len(ts.tasks))
+	tasks := db.Client.Database(db.DBName).Collection("tasks")
+
+	// set timeout for the function
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := tasks.Find(ctx, bson.D{})
+	if err != nil {
+		return nil, err
 	}
-	return result
+
+	var results []models.Task
+
+	for cursor.TryNext(ctx) {
+		var task models.Task
+		if err := cursor.Decode(&task); err != nil {
+			log.Println("Failed to decode task")
+			continue
+		}
+		results = append(results, task)
+	}
+	return results, nil
 }
 
 // AddTask is a method used to add
 // a new task into the tasks slice
-func (ts *TaskService) AddTask(task models.Task) (models.Task, error) {
-	// lock the count to increment it
-	ts.mutex.Lock()
-	task.ID = ts.next
-	ts.next += 1
-	ts.tasks = append(ts.tasks, &task)
-	ts.mutex.Unlock()
+func AddTask(task models.Task) (models.Task, error) {
+	tasks := db.Client.Database(db.DBName).Collection("tasks")
+
+	// set timeout for insert operation
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := tasks.InsertOne(ctx, task)
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	// set the generated ID back on the task
+	task.ID = result.InsertedID.(primitive.ObjectID)
 
 	return task, nil
-
 }
 
 // GetTaskByID iterates over all tasks and returns the task
 // if not found, returns an error
-func (ts *TaskService) GetTaskByID(id int) (models.Task, error) {
-	ts.mutex.RLock()
-	defer ts.mutex.RUnlock()
+func GetTaskByID(id string) (models.Task, error) {
+	tasks := db.Client.Database(db.DBName).Collection("tasks")
+	// set timeout for fetch operation
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	for _, t := range ts.tasks {
-		if t.ID == id {
-			return *t, nil
-		}
+	// convert id into primitive id of mongo
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return models.Task{}, fmt.Errorf("invalid ID format: %w", err)
 	}
-	return models.Task{}, fmt.Errorf("task does not exist")
+
+	// prepare filter
+	filter := bson.D{{Key: "_id", Value: objID}}
+	// find the document
+	var task models.Task
+	err = tasks.FindOne(ctx, filter).Decode(&task)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return models.Task{}, fmt.Errorf("task does not exist: %w", err)
+		}
+		return models.Task{}, err
+	}
+	return task, nil
 }
 
 // UpdateTask finds a task by id and updates it with the new modesl
 // if task is not found it returns an error
-func (ts *TaskService) UpdateTask(id int, modTask models.Task) (models.Task, error) {
-	ts.mutex.Lock()
-	defer ts.mutex.Unlock()
+func UpdateTask(id string, modTask models.Task) error {
+	tasks := db.Client.Database(db.DBName).Collection("tasks")
+	// set timeout for fetch operation
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	// find the task and update it
-	for _, task := range ts.tasks {
-		if task.ID == id {
-			task.Title = modTask.Title
-			task.Description = modTask.Description
-			task.DueDate = modTask.DueDate
-			task.Status = modTask.Status
-			// return the new updated task
-			return *task, nil
-		}
+	// convert id into primitive id of mongo
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return fmt.Errorf("invalid ID format: %w", err)
 	}
 
-	return models.Task{}, fmt.Errorf("task not found")
+	// prepare filer and update data
+	filter := bson.D{{Key: "_id", Value: objID}}
+	update := bson.D{
+		{Key: "$set", Value: bson.D{
+			{Key: "title", Value: modTask.Title},
+			{Key: "description", Value: modTask.Description},
+			{Key: "due_date", Value: modTask.DueDate},
+			{Key: "status", Value: modTask.Status},
+		},
+		},
+	}
 
+	result, err := tasks.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	// if document was not found
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("task not found")
+	}
+	return nil
 }
 
 // DeleteTaskByID removes a task from tasks slice
 // returns an error if task is not found
-func (ts *TaskService) DeleteTaskByID(id int) error {
-	ts.mutex.Lock()
-	defer ts.mutex.Unlock()
+func DeleteTaskByID(id string) error {
+	tasks := db.Client.Database(db.DBName).Collection("tasks")
+	// set timeout for fetch operation
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	for i, task := range ts.tasks {
-		if task.ID == id {
-			ts.tasks = slices.Delete(ts.tasks, i, i+1)
-			return nil
-		}
+	// convert id into primitive id of mongo
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return fmt.Errorf("invalid ID format: %w", err)
 	}
-	return fmt.Errorf("task with id %d is not found", id)
+
+	// prepare the filter
+	filter := bson.D{{Key: "_id", Value: objID}}
+
+	result := tasks.FindOneAndDelete(ctx, filter)
+	// check if the deletion was a success
+	var deletedTask models.Task
+	err = result.Decode(&deletedTask)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("task with id %s is not found", id)
+
+		}
+		return err
+	}
+
+	return nil
 }
