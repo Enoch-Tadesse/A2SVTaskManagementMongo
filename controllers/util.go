@@ -4,7 +4,19 @@ import (
 	"fmt"
 	"task_manager/models"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// getPrimitiveID function is used to extract and return
+// a valid primitive id if possible and returns ok value
+func getPrimitiveID(id string) (primitive.ObjectID, bool) {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return primitive.ObjectID{}, false
+	}
+	return objID, true
+}
 
 // isValidTask is a helping function used to check
 // whether a task is valid (contains appropriate
