@@ -1,269 +1,207 @@
-# Task Management API Documentation
+# Task Manager API Documentation
 
-Welcome to the **Task Management API** documentation! This API, built with **Go** and the **Gin Framework**, provides a simple yet powerful way to manage tasks using basic CRUD operations. It uses an in-memory database to store tasks, making it lightweight and ideal for development and testing purposes. Below, you'll find detailed information about each endpoint, including request formats, response formats, and example usage, as well as details about the routing configuration.
-
----
-
-## Table of Contents
-- [Overview](#overview)
-- [Base URL](#base-url)
-- [Router Configuration](#router-configuration)
-- [Endpoints](#endpoints)
-  - [1. Get All Tasks](#1-get-all-tasks)
-  - [2. Get Task by ID](#2-get-task-by-id)
-  - [3. Create a Task](#3-create-a-task)
-  - [4. Update a Task](#4-update-a-task)
-  - [5. Delete a Task](#5-delete-a-task)
-- [Task Model](#task-model)
-- [Error Handling](#error-handling)
-
----
-
-## Overview
-The Task Management API allows users to perform **Create, Read, Update, and Delete (CRUD)** operations on tasks. Tasks are stored in memory, ensuring fast access without the need for a persistent database. The API is designed to be intuitive, with clear request and response structures, proper error handling, and standard HTTP status codes.
+Welcome to the **Task Manager API**! This API allows you to manage tasks efficiently with endpoints for creating, retrieving, updating, and deleting tasks. Built with Go and Gin, it connects to a MongoDB database for persistent storage.
 
 ---
 
 ## Base URL
-All endpoints are accessible relative to the base URL:
-
-```
-http://localhost:8080
-```
-
----
-
-## Router Configuration
-The API uses the **Gin Framework** to handle routing, defined in the `router/router.go` file. The router is initialized with `gin.Default()`, which sets up a default Gin router with middleware for logging and recovery. All task-related endpoints are grouped under the `/tasks` route for better organization.
-
-- **Router Setup**: The `gin.Default()` function initializes the router with default middleware.
-- **Route Grouping**: All endpoints are grouped under `/tasks` using `router.Group("/tasks")`.
-- **Endpoints**:
-  - `GET /tasks`: Maps to `controllers.GetAllTasks`
-  - `GET /tasks/:id`: Maps to `controllers.GetTaskByID`
-  - `PUT /tasks/:id`: Maps to `controllers.UpdateTask`
-  - `DELETE /tasks/:id`: Maps to `controllers.DeleteTask`
-  - `POST /tasks`: Maps to `controllers.AddTask`
-- **Server Start**: The server runs on port `8080` using `router.Run(":8080")`.
-
-This configuration ensures a clean and modular routing structure, making it easy to extend the API with additional endpoints in the future.
+All endpoints are relative to the base URL:  
+**`http://localhost:8080`**
 
 ---
 
 ## Endpoints
 
 ### 1. Get All Tasks
-Retrieve a list of all tasks stored in the system.
+Retrieve a list of all tasks.
 
-- **Method**: `GET`
-- **Endpoint**: `/tasks`
-- **Request Parameters**: None
+- **Method**: GET
+- **Path**: `/tasks`
 - **Response**:
-  - **Status Code**: `200 OK`
-  - **Body**: Array of task objects
-- **Example Request**:
-  ```bash
-  curl -X GET http://localhost:8080/tasks
-  ```
-- **Example Response**:
-  ```json
-  [
+  - **Status Code**: 200 OK
+  - **Body**:
+    ```json
     {
-      "id": 1,
-      "title": "Complete Project Proposal",
-      "description": "Draft and submit the project proposal to the client.",
-      "due_date": "2025-07-20",
-      "status": "pending"
-    },
-    {
-      "id": 2,
-      "title": "Team Meeting",
-      "description": "Discuss project milestones with the team.",
-      "due_date": "2025-07-18",
-      "status": "completed"
+      "data": [
+        {
+          "id": "507f1f77bcf86cd799439011",
+          "title": "Complete project",
+          "description": "Finish the API documentation",
+          "due_date": "2025-08-01",
+          "status": "pending"
+        },
+        ...
+      ]
     }
-  ]
-  ```
-
-### 2. Get Task by ID
-Retrieve the details of a specific task by its ID.
-
-- **Method**: `GET`
-- **Endpoint**: `/tasks/:id`
-- **Request Parameters**:
-  - `id` (path parameter, integer): The ID of the task
-- **Response**:
-  - **Status Code**: `200 OK` (if found), `400 Bad Request` (invalid ID), `404 Not Found` (task not found)
-  - **Body**: Task object or error message
-- **Example Request**:
-  ```bash
-  curl -X GET http://localhost:8080/tasks/1
-  ```
-- **Example Response (Success)**:
-  ```json
-  {
-    "task": {
-      "id": 1,
-      "title": "Complete Project Proposal",
-      "description": "Draft and submit the project proposal to the client.",
-      "due_date": "2025-07-20",
-      "status": "pending"
-    }
-  }
-  ```
-- **Example Response (Error)**:
-  ```json
-  {
-    "error": "task does not exist"
-  }
-  ```
-
-### 3. Create a Task
-Create a new task with the provided details.
-
-- **Method**: `POST`
-- **Endpoint**: `/tasks`
-- **Request Body**:
-  ```json
-  {
-    "title": "string",
-    "description": "string",
-    "due_date": "YYYY-MM-DD",
-    "status": "string" // Must be "pending", "completed", or "missed"
-  }
-  ```
-- **Response**:
-  - **Status Code**: `201 Created` (if successful), `400 Bad Request` (invalid input)
-  - **Body**: Created task object or error message
-- **Example Request**:
-  ```bash
-  curl -X POST http://localhost:8080/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "New Task",
-    "description": "This is a new task.",
-    "due_date": "2025-07-25",
-    "status": "pending"
-  }'
-  ```
-- **Example Response (Success)**:
-  ```json
-  {
-    "message": "task created successfully",
-    "task": {
-      "id": 3,
-      "title": "New Task",
-      "description": "This is a new task.",
-      "due_date": "2025-07-25",
-      "status": "pending"
-    }
-  }
-  ```
-- **Example Response (Error)**:
-  ```json
-  {
-    "error": "title can not be empty"
-  }
-  ```
-
-### 4. Update a Task
-Update an existing task with new details.
-
-- **Method**: `PUT`
-- **Endpoint**: `/tasks/:id`
-- **Request Parameters**:
-  - `id` (path parameter, integer): The ID of the task to update
-- **Request Body**:
-  ```json
-  {
-    "title": "string",
-    "description": "string",
-    "due_date": "YYYY-MM-DD",
-    "status": "string" // Must be "pending", "completed", or "missed"
-  }
-  ```
-- **Response**:
-  - **Status Code**: `200 OK` (if successful), `400 Bad Request` (invalid input), `404 Not Found` (task not found)
-  - **Body**: Updated task object or error message
-- **Example Request**:
-  ```bash
-  curl -X PUT Http://localhost:8080/tasks/1 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Updated Task",
-    "description": "Updated description.",
-    "due_date": "2025-07-22",
-    "status": "completed"
-  }'
-  ```
-- **Example Response (Success)**:
-  ```json
-  {
-    "message": "task updated successfully",
-    "task": {
-      "id": 1,
-      "title": "Updated Task",
-      "description": "Updated description.",
-      "due_date": "2025-07-22",
-      "status": "completed"
-    }
-  }
-  ```
-- **Example Response (Error)**:
-  ```json
-  {
-    "error": "task not found"
-  }
-  ```
-
-### 5. Delete a Task
-Delete a task by its ID.
-
-- **Method**: `DELETE`
-- **Endpoint**: `/tasks/:id`
-- **Request Parameters**:
-  - `id` (path parameter, integer): The ID of the task to delete
-- **Response**:
-  - **Status Code**: `200 OK` (if successful), `400 Bad Request` (invalid ID), `404 Not Found` (task not found)
-  - **Body**: Success message or error message
-- **Example Request**:
-  ```bash
-  curl -X DELETE http://localhost:8080/tasks/1
-  ```
-- **Example Response (Success)**:
-  ```json
-  {
-    "message": "task deleted successfully"
-  }
-  ```
-- **Example Response (Error)**:
-  ```json
-  {
-    "error": "task with id 1 is not found"
-  }
-  ```
+    ```
+  - **Error**:
+    - **500 Internal Server Error**: `{ "error": "Failed to fetch tasks: <error message>" }`
 
 ---
 
-## Task Model
-The task object has the following structure:
+### 2. Get Task by ID
+Retrieve a specific task by its ID.
 
-| Field         | Type   | Description                                      | Constraints                              |
-|---------------|--------|--------------------------------------------------|------------------------------------------|
-| `id`          | Integer| Unique identifier for the task                   | Auto-generated, read-only                |
-| `title`       | String | Title of the task                               | Required, cannot be empty                |
-| `description` | String | Detailed description of the task                | Optional                                 |
-| `due_date`    | String | Due date for the task (format: `YYYY-MM-DD`)    | Required, must be in the future          |
-| `status`      | String | Status of the task                              | Must be `pending`, `completed`, or `missed` |
+- **Method**: GET
+- **Path**: `/tasks/:id`
+- **Parameters**:
+  - `id` (path): MongoDB ObjectID of the task (e.g., `507f1f77bcf86cd799439011`)
+- **Response**:
+  - **Status Code**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "task": {
+        "id": "507f1f77bcf86cd799439011",
+        "title": "Complete project",
+        "description": "Finish the API documentation",
+        "due_date": "2025-08-01",
+        "status": "pending"
+      }
+    }
+    ```
+  - **Errors**:
+    - **400 Bad Request**: `{ "error": "id can not be empty" }` or `{ "error": "invalid id format" }`
+    - **404 Not Found**: `{ "error": "failed to retrieve task: <error message>" }`
+
+---
+
+### 3. Create a Task
+Add a new task to the collection.
+
+- **Method**: POST
+- **Path**: `/tasks`
+- **Request Body**:
+  ```json
+  {
+    "title": "New Task",
+    "description": "Task description",
+    "due_date": "2025-08-01",
+    "status": "pending"
+  }
+  ```
+- **Response**:
+  - **Status Code**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "message": "task created successfully",
+      "data": {
+        "id": "507f1f77bcf86cd799439011",
+        "title": "New Task",
+        "description": "Task description",
+        "due_date": "2025-08-01",
+        "status": "pending"
+      }
+    }
+    ```
+  - **Errors**:
+    - **400 Bad Request**:
+      - `{ "error": "invalid request body" }`
+      - `{ "error": "title can not be empty" }`
+      - `{ "error": "due date can not be in the past" }`
+      - `{ "error": "invalid status" }`
+    - **404 Not Found**: `{ "error": "<error message>" }`
+
+---
+
+### 4. Update a Task
+Fully replace an existing task with new data.
+
+- **Method**: PUT
+- **Path**: `/tasks/:id`
+- **Parameters**:
+  - `id` (path): MongoDB ObjectID of the task
+- **Request Body**:
+  ```json
+  {
+    "title": "Updated Task",
+    "description": "Updated description",
+    "due_date": "2025-09-01",
+    "status": "completed"
+  }
+  ```
+- **Response**:
+  - **Status Code**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "message": "task updated successfully"
+    }
+    ```
+  - **Errors**:
+    - **400 Bad Request**:
+      - `{ "error": "invalid id format" }`
+      - `{ "error": "invalid request body" }`
+      - `{ "error": "title can not be empty" }`
+      - `{ "error": "due date can not be in the past" }`
+      - `{ "error": "invalid status" }`
+    - **404 Not Found**: `{ "error": "task not found" }`
+
+---
+
+### 5. Delete a Task
+Remove a task by its ID.
+
+- **Method**: DELETE
+- **Path**: `/tasks/:id`
+- **Parameters**:
+  - `id` (path): MongoDB ObjectID of the task
+- **Response**:
+  - **Status Code**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "message": "task deleted successfully"
+    }
+    ```
+  - **Errors**:
+    - **400 Bad Request**:
+      - `{ "error": "id can not be empty" }`
+      - `{ "error": "invalid id format" }`
+    - **404 Not Found**: `{ "error": "task with id <id> is not found" }`
+
+---
+
+## Data Model
+The API uses the following task structure:
+
+```json
+{
+  "id": "MongoDB ObjectID",
+  "title": "string",
+  "description": "string",
+  "due_date": "YYYY-MM-DD",
+  "status": "pending | completed | missed"
+}
+```
+
+- **id**: Unique identifier (MongoDB ObjectID).
+- **title**: Task title (required, non-empty).
+- **description**: Task description (optional).
+- **due_date**: Due date in `YYYY-MM-DD` format (must be in the future).
+- **status**: Task status (must be `pending`, `completed`, or `missed`).
 
 ---
 
 ## Error Handling
-The API uses standard HTTP status codes to indicate the success or failure of requests:
+The API returns errors in the following format:
 
-- **200 OK**: Request was successful.
-- **201 Created**: Resource was successfully created.
-- **400 Bad Request**: Invalid input (e.g., missing fields, invalid ID, or past due date).
-- **404 Not Found**: Requested resource (task) does not exist.
+```json
+{
+  "error": "<error message>"
+}
+```
 
-Error responses include a JSON object with an `error` field describing the issue.
+Common error codes:
+- **400 Bad Request**: Invalid input or request format.
+- **404 Not Found**: Task or resource not found.
+- **500 Internal Server Error**: Server-side issue.
+
+---
+
+## Notes
+- All endpoints require a valid MongoDB ObjectID for operations involving task IDs.
+- The `status` field is case-insensitive and automatically converted to lowercase.
+- Due dates must be in the future and in `YYYY-MM-DD` format.
+- The API uses a MongoDB database, so ensure the database connection is properly configured.
