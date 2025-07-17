@@ -26,7 +26,9 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 // Before method is used to compare if a
 // certain time is before the date or not
 func (d Date) Before(t time.Time) bool {
-	return time.Time(d).Before(t)
+	dTime := time.Time(d).Truncate(24 * time.Hour)
+	tTime := t.Truncate(24 * time.Hour)
+	return dTime.Before(tTime)
 }
 
 // MarshalJSON is overriden method for Date type used
