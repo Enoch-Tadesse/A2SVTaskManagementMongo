@@ -17,7 +17,6 @@ import (
 // GetAllTasks is a function that return
 // all tasks currently available
 func GetAllTasks() ([]models.Task, error) {
-	// result := make([]models.Task, len(ts.tasks))
 	tasks := db.Client.Database(db.DBName).Collection("tasks")
 
 	// set timeout for the function
@@ -34,7 +33,7 @@ func GetAllTasks() ([]models.Task, error) {
 	for cursor.TryNext(ctx) {
 		var task models.Task
 		if err := cursor.Decode(&task); err != nil {
-			log.Println("Failed to decode task")
+			log.Printf("Failed to decode task: %s", err.Error())
 			continue
 		}
 		results = append(results, task)
@@ -64,23 +63,17 @@ func AddTask(task models.Task) (models.Task, error) {
 
 // GetTaskByID iterates over all tasks and returns the task
 // if not found, returns an error
-func GetTaskByID(id string) (models.Task, error) {
+func GetTaskByID(id primitive.ObjectID) (models.Task, error) {
 	tasks := db.Client.Database(db.DBName).Collection("tasks")
 	// set timeout for fetch operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// convert id into primitive id of mongo
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return models.Task{}, fmt.Errorf("invalid ID format: %w", err)
-	}
-
 	// prepare filter
-	filter := bson.D{{Key: "_id", Value: objID}}
+	filter := bson.D{{Key: "_id", Value: id}}
 	// find the document
 	var task models.Task
-	err = tasks.FindOne(ctx, filter).Decode(&task)
+	err := tasks.FindOne(ctx, filter).Decode(&task)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return models.Task{}, fmt.Errorf("task does not exist: %w", err)
@@ -92,20 +85,15 @@ func GetTaskByID(id string) (models.Task, error) {
 
 // UpdateTask finds a task by id and updates it with the new modesl
 // if task is not found it returns an error
-func UpdateTask(id string, modTask models.Task) error {
+func UpdateTask(id primitive.ObjectID, modTask models.Task) error {
 	tasks := db.Client.Database(db.DBName).Collection("tasks")
 	// set timeout for fetch operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// convert id into primitive id of mongo
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return fmt.Errorf("invalid ID format: %w", err)
-	}
-
-	// prepare filer and update data
-	filter := bson.D{{Key: "_id", Value: objID}}
+	// prepare filter data
+	filter := bson.D{{Key: "_id", Value: id}}
+	// prepare the update data
 	update := bson.D{
 		{Key: "$set", Value: bson.D{
 			{Key: "title", Value: modTask.Title},
@@ -129,25 +117,19 @@ func UpdateTask(id string, modTask models.Task) error {
 
 // DeleteTaskByID removes a task from tasks slice
 // returns an error if task is not found
-func DeleteTaskByID(id string) error {
+func DeleteTaskByID(id primitive.ObjectID) error {
 	tasks := db.Client.Database(db.DBName).Collection("tasks")
 	// set timeout for fetch operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// convert id into primitive id of mongo
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return fmt.Errorf("invalid ID format: %w", err)
-	}
-
 	// prepare the filter
-	filter := bson.D{{Key: "_id", Value: objID}}
+	filter := bson.D{{Key: "_id", Value: id}}
 
 	result := tasks.FindOneAndDelete(ctx, filter)
 	// check if the deletion was a success
 	var deletedTask models.Task
-	err = result.Decode(&deletedTask)
+	err := result.Decode(&deletedTask)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return fmt.Errorf("task with id %s is not found", id)

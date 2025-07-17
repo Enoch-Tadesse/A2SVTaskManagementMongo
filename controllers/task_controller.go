@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // GetAllTasks handles the HTTP GET request to retrieve all tasks.
 func GetAllTasks(c *gin.Context) {
 	tasks, err := data.GetAllTasks()
@@ -36,7 +35,16 @@ func GetTaskByID(c *gin.Context) {
 		return
 	}
 
-	task, err := data.GetTaskByID(id)
+	// get the primitive ID
+	_id, ok := getPrimitiveID(id)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid id format",
+		})
+		return
+	}
+
+	task, err := data.GetTaskByID(_id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": fmt.Sprintf("failed to retrieve task: %s", err.Error()),
@@ -60,8 +68,17 @@ func DeleteTask(c *gin.Context) {
 		return
 	}
 
+	// get the primitive ID
+	_id, ok := getPrimitiveID(id)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid id format",
+		})
+		return
+	}
+
 	// delete the task
-	if err := data.DeleteTaskByID(id); err != nil {
+	if err := data.DeleteTaskByID(_id); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": fmt.Sprintf("failed to delete task: %s", err.Error()),
 		})
@@ -78,10 +95,11 @@ func DeleteTask(c *gin.Context) {
 // UpdateTask handles the HTTP PUT request to fully replace a task with a new one.
 func UpdateTask(c *gin.Context) {
 	id := c.Param("id")
-	// check for id value
-	if id == "" {
+	// get the primitive ID
+	_id, ok := getPrimitiveID(id)
+	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "id can not be empty",
+			"error": "invalid id format",
 		})
 		return
 	}
@@ -107,7 +125,7 @@ func UpdateTask(c *gin.Context) {
 	}
 
 	// update the task
-	err := data.UpdateTask(id, body)
+	err := data.UpdateTask(_id, body)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
